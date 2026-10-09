@@ -158,4 +158,9 @@
   html {
     @apply font-sans;
     }
+  .desktop-only {
+    @media (max-width: 640px) {
+      display: none !important;
+    }
+  }
 }
