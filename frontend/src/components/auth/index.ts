@@ -1,5 +1,6 @@
 export * from './AuthAlert'
 export * from './AuthCard'
+export * from './AuthFooter'
 export * from './AuthLayout'
 export * from './messages'
 export * from './styles'

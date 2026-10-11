@@ -1,0 +1,25 @@
+{
+  "name": "dcs-auth-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DCS auth microservice: sessions, login, Google OAuth, password reset.",
+  "scripts": {
+    "dev": "node --watch src/index.ts",
+    "start": "node src/index.ts",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "better-sqlite3": "^12.4.1",
+    "hono": "^4.6.0",
+    "jose": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~5.9.0"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true
+  }
+}

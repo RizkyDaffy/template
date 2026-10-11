@@ -5,9 +5,9 @@ import {
   Typography,
 } from '@mui/material'
 import { Button as AntButton, Divider } from 'antd'
-import { Eye, EyeOff, ShieldAlert, Sparkles } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   AUTH_MESSAGES,
   AuthAlert,
@@ -16,9 +16,8 @@ import {
   AuthLayout,
   authFormStyles,
 } from '@/components/auth'
-
-const MAX_LOGIN_ATTEMPTS = 3
-const LOCKOUT_DURATION_SECONDS = 60
+import { api, ApiError } from '@/lib/api'
+import { useAuth } from '@/lib/auth'
 
 const styles = {
   ...authFormStyles,
@@ -105,51 +104,15 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [googleLoading, setGoogleLoading] = useState(false)
-
-  // Rate Limiting / 3x Retries + 1 Minute Lockout
-  const [failedAttempts, setFailedAttempts] = useState(0)
-  const [lockoutSeconds, setLockoutSeconds] = useState(0)
   const [alertData, setAlertData] = useState<AuthAlertData | null>(null)
-  const [showSimulator, setShowSimulator] = useState(false)
+  const navigate = useNavigate()
+  const { signIn } = useAuth()
 
-  const isLocked = lockoutSeconds > 0
-
-  // Cooldown countdown timer
-  useEffect(() => {
-    if (lockoutSeconds <= 0) return
-
-    const timer = setInterval(() => {
-      setLockoutSeconds((prev) => {
-        if (prev <= 1) {
-          // Lockout ended, reset counter
-          setFailedAttempts(0)
-          setAlertData({
-            type: 'info',
-            title: 'Kunci Dibuka',
-            message: 'Masa tunggu selesai. Anda dapat mencoba login kembali.',
-          })
-          return 0
-        }
-        const updated = prev - 1
-        setAlertData(AUTH_MESSAGES.lockout(updated))
-        return updated
-      })
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [lockoutSeconds])
-
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (isLocked) {
-      setAlertData(AUTH_MESSAGES.lockout(lockoutSeconds))
-      return
-    }
-
     const trimmedWorkId = workId.trim()
-    const trimmedPassword = password.trim()
+    const trimmedPassword = password
 
     if (!trimmedWorkId || !trimmedPassword) {
       setAlertData(AUTH_MESSAGES.fieldRequired())
@@ -157,162 +120,33 @@ export function LoginPage() {
     }
 
     setLoading(true)
-
-    setTimeout(() => {
-      setLoading(false)
-
-      // Skenario 1: Backend / Server terputus
-      if (trimmedWorkId === 'offline' || trimmedPassword === 'offline') {
-        setAlertData(AUTH_MESSAGES.serverDisconnected())
-        return
-      }
-
-      // Skenario 2: Akun tidak terdaftar / kredensial tidak valid
-      if (
-        trimmedWorkId === 'unregistered' ||
-        trimmedWorkId === 'unknown' ||
-        trimmedWorkId.toLowerCase().includes('notfound')
-      ) {
-        setAlertData(AUTH_MESSAGES.invalidCredentials())
-        return
-      }
-
-      // Skenario 3: Login gagal umum
-      if (trimmedWorkId === 'error') {
-        setAlertData(AUTH_MESSAGES.loginFailed())
-        return
-      }
-
-      // Skenario 4: Login sukses (jika kredensial valid)
-      if (trimmedWorkId === 'admin' && trimmedPassword === 'admin123') {
-        setFailedAttempts(0)
-        setAlertData(AUTH_MESSAGES.googleSuccess())
-        return
-      }
-
-      // Skenario 5: Salah password dengan counter 3x & lockout 1 menit
-      const nextFailed = failedAttempts + 1
-      setFailedAttempts(nextFailed)
-
-      if (nextFailed >= MAX_LOGIN_ATTEMPTS) {
-        // Trigger 1-minute lockout
-        setLockoutSeconds(LOCKOUT_DURATION_SECONDS)
-        setAlertData(AUTH_MESSAGES.lockout(LOCKOUT_DURATION_SECONDS))
-      } else {
-        const remaining = MAX_LOGIN_ATTEMPTS - nextFailed
-        setAlertData(AUTH_MESSAGES.wrongPassword(remaining))
-      }
-    }, 600)
-  }
-
-  // Google 3rd party auth handler
-  const handleGoogleLogin = () => {
-    if (isLocked) {
-      setAlertData(AUTH_MESSAGES.lockout(lockoutSeconds))
-      return
-    }
-
-    setGoogleLoading(true)
     setAlertData(null)
-
-    setTimeout(() => {
-      setGoogleLoading(false)
-      setFailedAttempts(0)
-      setAlertData(AUTH_MESSAGES.googleSuccess())
-    }, 900)
+    try {
+      const { user } = await api.login(trimmedWorkId, trimmedPassword)
+      signIn(user)
+      navigate('/', { replace: true })
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setAlertData({
+          type: err.status === 423 ? 'warning' : 'error',
+          title: 'Gagal Masuk',
+          message: err.message,
+        })
+      } else {
+        setAlertData(AUTH_MESSAGES.loginFailed())
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   const helpContent = (
-    <div className="flex flex-col items-center gap-3">
-      <Typography sx={styles.help}>
-        Need assistance signing in?{' '}
-        <a href="#" style={styles.helpLink} onClick={(e) => e.preventDefault()} className="hover:underline">
-          Contact IT Support
-        </a>
-      </Typography>
-
-      {/* Quick Interactive Testing Bar for All Requested Alerts */}
-      <button
-        type="button"
-        onClick={() => setShowSimulator((prev) => !prev)}
-        className="flex items-center gap-1.5 text-xs text-indigo-400/80 hover:text-indigo-300 transition-colors cursor-pointer bg-indigo-950/30 px-3 py-1 rounded-full border border-indigo-500/20"
-      >
-        <Sparkles size={13} />
-        {showSimulator ? 'Sembunyikan Simulasi Alert' : 'Simulasi Cepat Alert (Klik untuk Coba)'}
-      </button>
-
-      {showSimulator && (
-        <div className="w-full max-w-[375px] p-3 rounded-xl bg-[#16171b] border border-white/10 flex flex-col gap-2 mt-1 animate-in fade-in duration-150">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-white/70">
-            <ShieldAlert size={14} className="text-indigo-400" />
-            Uji Langsung Kasus Alert:
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                const nextFailed = failedAttempts + 1
-                setFailedAttempts(nextFailed)
-                if (nextFailed >= MAX_LOGIN_ATTEMPTS) {
-                  setLockoutSeconds(LOCKOUT_DURATION_SECONDS)
-                  setAlertData(AUTH_MESSAGES.lockout(LOCKOUT_DURATION_SECONDS))
-                } else {
-                  setAlertData(AUTH_MESSAGES.wrongPassword(MAX_LOGIN_ATTEMPTS - nextFailed))
-                }
-              }}
-              style={styles.scenarioBadge}
-              className="hover:bg-white/15 hover:text-white"
-            >
-              Salah Password ({Math.max(0, MAX_LOGIN_ATTEMPTS - failedAttempts)}x lagi)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFailedAttempts(MAX_LOGIN_ATTEMPTS)
-                setLockoutSeconds(LOCKOUT_DURATION_SECONDS)
-                setAlertData(AUTH_MESSAGES.lockout(LOCKOUT_DURATION_SECONDS))
-              }}
-              style={styles.scenarioBadge}
-              className="hover:bg-amber-500/20 hover:text-amber-200"
-            >
-              Kunci 1 Menit (Lockout)
-            </button>
-            <button
-              type="button"
-              onClick={() => setAlertData(AUTH_MESSAGES.invalidCredentials())}
-              style={styles.scenarioBadge}
-              className="hover:bg-rose-500/20 hover:text-rose-200"
-            >
-              Kredensial Tidak Valid
-            </button>
-            <button
-              type="button"
-              onClick={() => setAlertData(AUTH_MESSAGES.googleSuccess())}
-              style={styles.scenarioBadge}
-              className="hover:bg-emerald-500/20 hover:text-emerald-200"
-            >
-              Google Auth Berhasil
-            </button>
-            <button
-              type="button"
-              onClick={() => setAlertData(AUTH_MESSAGES.loginFailed())}
-              style={styles.scenarioBadge}
-              className="hover:bg-rose-500/20 hover:text-rose-200"
-            >
-              Login Gagal
-            </button>
-            <button
-              type="button"
-              onClick={() => setAlertData(AUTH_MESSAGES.serverDisconnected())}
-              style={styles.scenarioBadge}
-              className="hover:bg-rose-500/20 hover:text-rose-200"
-            >
-              Server Terputus
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+    <Typography sx={styles.help}>
+      Need assistance signing in?{' '}
+      <a href="#" style={styles.helpLink} onClick={(e) => e.preventDefault()} className="hover:underline">
+        Contact IT Support
+      </a>
+    </Typography>
   )
 
   return (
@@ -340,9 +174,9 @@ export function LoginPage() {
               value={workId}
               onChange={(e) => {
                 setWorkId(e.target.value)
-                if (alertData?.type === 'error' && !isLocked) setAlertData(null)
+                if (alertData?.type === 'error') setAlertData(null)
               }}
-              disabled={loading || googleLoading || isLocked}
+              disabled={loading}
               sx={styles.input}
               slotProps={{ input: { autoComplete: 'username' } }}
             />
@@ -365,9 +199,9 @@ export function LoginPage() {
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value)
-                if (alertData?.type === 'error' && !isLocked) setAlertData(null)
+                if (alertData?.type === 'error') setAlertData(null)
               }}
-              disabled={loading || googleLoading || isLocked}
+              disabled={loading}
               sx={styles.input}
               slotProps={{
                 input: {
@@ -377,7 +211,6 @@ export function LoginPage() {
                       <IconButton
                         onClick={() => setShowPassword((s) => !s)}
                         edge="end"
-                        disabled={isLocked}
                         sx={{ color: 'rgba(255,255,255,0.6)' }}
                         aria-label="toggle password visibility"
                       >
@@ -394,28 +227,23 @@ export function LoginPage() {
             type="primary"
             htmlType="submit"
             loading={loading}
-            disabled={isLocked}
             style={styles.primaryBtn}
             className="w-full cursor-pointer"
           >
-            {isLocked
-              ? `Terkunci (${lockoutSeconds}s)`
-              : loading
-                ? 'Memverifikasi...'
-                : 'Login'}
+            {loading ? 'Memverifikasi...' : 'Login'}
           </AntButton>
 
           <Divider style={styles.or}>OR</Divider>
 
           <AntButton
             type="default"
-            loading={googleLoading}
-            disabled={isLocked}
-            onClick={handleGoogleLogin}
+            onClick={() => {
+              window.location.href = api.googleUrl
+            }}
             style={styles.googleBtn}
             className="cursor-pointer"
           >
-            {!googleLoading && <GoogleIcon />}
+            <GoogleIcon />
             Sign in with Google
           </AntButton>
         </form>

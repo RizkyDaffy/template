@@ -49,6 +49,28 @@ export const authFormStyles = {
         color: 'rgba(255,255,255,0.4)',
         opacity: 1,
       },
+      '& .MuiInputBase-input.Mui-disabled': {
+        color: '#636363',
+        WebkitTextFillColor: '#636363',
+      },
+      // Block WebKit/Chrome autofill styling (Gboard / Google credential manager
+      // fills the input with an opaque light background). An inset box-shadow
+      // paints over it since `background-color` alone is ignored on autofill.
+      // `!important` is required: Chrome's UA stylesheet forces its own values
+      // on :autofill and only !important beats them. BOTH pseudo-classes are
+      // targeted: modern Chrome Android styles autofill via the standard
+      // `:autofill`, older via `:-webkit-autofill` — missing either makes the
+      // autofilled text render black. `color-scheme: dark` stops UA-internal
+      // light/dark (light-dark()) colors from resolving to black.
+      '& .MuiInputBase-input:-webkit-autofill, & .MuiInputBase-input:autofill, & .MuiInputBase-input:-webkit-autofill:hover, & .MuiInputBase-input:autofill:hover, & .MuiInputBase-input:-webkit-autofill:focus, & .MuiInputBase-input:autofill:focus, & .MuiInputBase-input:-webkit-autofill:active, & .MuiInputBase-input:autofill:active': {
+        WebkitTextFillColor: '#fff !important',
+        color: '#fff !important',
+        caretColor: '#fff !important',
+        colorScheme: 'dark',
+        boxShadow: '0 0 0 1000px #0f1013 inset',
+        borderRadius: '10px',
+        transition: 'background-color 9999s ease-in-out 0s',
+      },
     },
   },
   primaryBtn: {
@@ -85,36 +107,40 @@ export const authLayoutStyles = {
     background: '#121318',
     color: '#fff',
     fontFamily: FONT_FAMILY,
-    padding: '24px 16px',
+    padding: '16px',
     boxSizing: 'border-box',
   },
   title: {
     fontSize: '28px',
     fontWeight: 700,
     textAlign: 'center',
-    marginBottom: '32px',
+    marginBottom: '24px',
     letterSpacing: '-0.02em',
   },
   footer: {
-    marginTop: '24px',
+    position: 'fixed',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1100, // t.zIndex.appBar
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '14px 16px',
+    borderTop: '1px solid rgba(255,255,255,0.06)',
+    background: '#121318', // opaque, same as page
+    boxSizing: 'border-box',
+  },
+  footerText: {
     fontSize: '11px',
-    color: 'rgba(255,255,255,0.45)',
+    color: 'rgba(255,255,255,0.5)',
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
     flexWrap: 'wrap',
     justifyContent: 'center',
     textAlign: 'center',
-    padding: '12px 16px',
-    '@media (max-width: 640px)': {
-      position: 'sticky',
-      bottom: 0,
-      width: '100%',
-      marginTop: 'auto',
-      background: 'rgba(18,19,24,0.98)',
-      backdropFilter: 'blur(8px)',
-      borderTop: '1px solid rgba(255,255,255,0.06)',
-    },
+    lineHeight: 1.6,
   },
   dot: {
     color: 'rgba(255,255,255,0.25)',

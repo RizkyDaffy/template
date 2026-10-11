@@ -8,7 +8,6 @@ import {
 import React from 'react'
 import {
   Alert,
-  AlertAction,
   AlertDescription,
   AlertTitle,
 } from '@/components/ui/alert'
@@ -61,9 +60,17 @@ const defaultIcons: Record<AuthAlertType, React.ReactNode> = {
   info: <Info className="size-4 text-sky-400 shrink-0" />,
 }
 
+/** Indent that aligns content under the title (icon size 16px + gap 8px). */
+const CONTENT_INDENT = 'pl-6'
+
 /**
  * Modular AuthAlert built on top of shadcn UI Alert.
- * Provides consistent coloring, typography, icons, and dismissal across all auth pages.
+ *
+ * Layout (per design spec):
+ * - Row 1: icon + title on the left, close button on the far right.
+ * - Row 2: description on its own full-width line, indented to align
+ *   with the title text — so long messages wrap across the whole alert
+ *   width instead of being squeezed into a narrow column on mobile.
  */
 export function AuthAlert({
   type = 'info',
@@ -80,35 +87,39 @@ export function AuthAlert({
   return (
     <Alert
       className={cn(
-        'shadow-sm animate-in fade-in zoom-in-95 duration-200 transition-all',
+        // Own vertical layout instead of the base grid, so the description
+        // gets the full alert width (the base grid reserves pr-18 for an
+        // absolute close button and squeezes wrapped text on phones).
+        'flex flex-col gap-1.5 pr-3 animate-in fade-in zoom-in-95 duration-200 transition-all',
         currentStyle.container,
         className,
       )}
     >
-      {displayIcon}
-      <div className="flex flex-col gap-0.5 pr-2">
-        {displayTitle && (
-          <AlertTitle className={cn('font-semibold leading-tight text-sm', currentStyle.title)}>
+      {/* Row 1: icon + title, close button far right */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          {displayIcon}
+          <AlertTitle className={cn('truncate font-semibold leading-tight text-sm', currentStyle.title)}>
             {displayTitle}
           </AlertTitle>
-        )}
-        <AlertDescription className={cn('text-sm leading-snug', currentStyle.text)}>
-          {message}
-        </AlertDescription>
-      </div>
+        </div>
 
-      {onClose && (
-        <AlertAction className="top-2 right-2">
+        {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="cursor-pointer rounded p-0.5 text-white/50 hover:text-white/90 hover:bg-white/10 transition-colors"
+            className="shrink-0 cursor-pointer rounded p-1 text-white/50 hover:text-white/90 hover:bg-white/10 transition-colors"
             aria-label="Tutup notifikasi"
           >
             <X size={14} />
           </button>
-        </AlertAction>
-      )}
+        )}
+      </div>
+
+      {/* Row 2: full-width description, aligned with the title text */}
+      <AlertDescription className={cn('text-sm leading-snug', CONTENT_INDENT, currentStyle.text)}>
+        {message}
+      </AlertDescription>
     </Alert>
   )
 }

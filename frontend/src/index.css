@@ -154,9 +154,27 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
+    /* no zoom in/out (desktop: ctrl+wheel & pinch) + no text select / long-press select */
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: pan-y pinch-zoom; /* keep native scroll, block browser zoom gestures */
+    overscroll-behavior: none;
+    }
+  input, textarea, [contenteditable='true'] {
+    user-select: text;
+    -webkit-user-select: text;
+    -webkit-touch-callout: default;
+    touch-action: auto;
     }
   html {
     @apply font-sans;
+    /* hide scrollbar, still scrolls */
+    scrollbar-width: none;         /* Firefox */
+    -ms-overflow-style: none;      /* old Edge */
+    &::-webkit-scrollbar {         /* Chrome/Safari */
+      display: none;
+    }
     }
   .desktop-only {
     @media (max-width: 640px) {

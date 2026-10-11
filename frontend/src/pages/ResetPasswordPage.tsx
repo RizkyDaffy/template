@@ -20,6 +20,7 @@ import {
   AuthLayout,
   authFormStyles,
 } from '@/components/auth'
+import { api, ApiError } from '@/lib/api'
 
 const styles = {
   ...authFormStyles,
@@ -54,6 +55,12 @@ const styles = {
     color: 'rgba(255,255,255,0.6)',
     lineHeight: 1.5,
   },
+  btnContent: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+  },
   backLink: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -71,7 +78,7 @@ export function ResetPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [alertData, setAlertData] = useState<AuthAlertData | null>(null)
 
-  const handleReset = (e: React.FormEvent) => {
+  const handleReset = async (e: React.FormEvent) => {
     e.preventDefault()
 
     const trimmed = identifier.trim()
@@ -82,12 +89,18 @@ export function ResetPasswordPage() {
 
     setLoading(true)
     setAlertData(null)
-
-    // Simulate sending reset password instructions
-    setTimeout(() => {
-      setLoading(false)
+    try {
+      await api.requestReset(trimmed)
       setAlertData(AUTH_MESSAGES.resetEmailSuccess())
-    }, 800)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setAlertData({ type: 'error', title: 'Gagal Mengirim', message: err.message })
+      } else {
+        setAlertData(AUTH_MESSAGES.loginFailed())
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   const helpContent = (
@@ -155,16 +168,16 @@ export function ResetPasswordPage() {
             type="primary"
             htmlType="submit"
             loading={loading}
-            style={{ ...styles.primaryBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
             className="w-full cursor-pointer"
+            style={styles.primaryBtn as React.CSSProperties}
           >
             {loading ? (
               'Mengirim...'
             ) : alertData?.type === 'success' ? (
-              <>
+              <span style={styles.btnContent}>
                 <RefreshCw size={16} />
                 Kirim Ulang
-              </>
+              </span>
             ) : (
               'Reset Password'
             )}
